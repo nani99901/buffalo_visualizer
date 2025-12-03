@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:pluto_grid/pluto_grid.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:intl/intl.dart';
@@ -46,6 +49,8 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
 
   final NumberFormat _numberFormat = NumberFormat.decimalPattern();
 
+  late TooltipBehavior _tooltipBehavior;
+
   Map<String, dynamic> _buffaloDetails = {};
   Map<String, Map<String, Map<String, dynamic>>> _monthlyRevenue = {};
   Map<String, Map<String, double>> _investorMonthlyRevenue = {};
@@ -55,6 +60,7 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
     super.initState();
     _initializeBuffaloDetails();
     _calculateDetailedMonthlyRevenue();
+    _tooltipBehavior = TooltipBehavior(enable: true, format: 'point.x : point.y');
     _selectedYear = widget.treeData['startYear'] ?? DateTime.now().year;
   }
 
@@ -562,7 +568,10 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
   Widget _buildRevenueGraph() {
     final yearlyData = widget.revenueData['yearlyData'] as List<dynamic>;
     final List<ChartData> chartData = yearlyData.map((data) {
-      return ChartData(data['year'].toString(), (data['revenue'] as num).toDouble());
+      return ChartData(
+        data['year'].toString(),
+        (data['revenue'] as num).toDouble(),
+      );
     }).toList();
 
     return Container(
@@ -574,6 +583,7 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
         border: Border.all(color: Colors.grey[300]!),
       ),
       child: SfCartesianChart(
+        tooltipBehavior: _tooltipBehavior,
         title: ChartTitle(
           text: 'Revenue Trends',
           textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
@@ -614,6 +624,7 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
         border: Border.all(color: Colors.grey[300]!),
       ),
       child: SfCartesianChart(
+        tooltipBehavior: _tooltipBehavior,
         title: ChartTitle(
           text: 'Herd Growth',
           textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
@@ -634,56 +645,248 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
     );
   }
 
-  // Production Analysis Graph Widget
-  Widget _buildProductionAnalysisGraph() {
-    final yearlyData = widget.revenueData['yearlyData'] as List<dynamic>;
-    final List<ChartData> producingData = yearlyData.map((data) {
-      return ChartData(
-        data['year'].toString(),
-        (data['totalBuffaloes'] as num).toDouble(),
-      );
-    }).toList();
+  // Buffalo Population Growth Graph (Matching React component)
+Widget _buildBuffaloPopulationGrowthGraph() {
+  final yearlyData = widget.revenueData['yearlyData'] as List<dynamic>;
+  
+  if (yearlyData.isEmpty) return Container();
+  
+  // Find max buffaloes for percentage calculation
+  final maxBuffaloes = yearlyData.fold<double>(
+    0, 
+    (max, data) => math.max(max, (data['totalBuffaloes'] as num).toDouble())
+  );
 
-    final List<ChartData> nonProducingData = yearlyData.map((data) {
-      final total = data['totalBuffaloes'] as int;
-      final producing = data['producingBuffaloes'] as int;
-      return ChartData(data['year'].toString(), (total - producing).toDouble());
-    }).toList();
-
-    return Container(
-      height: 400,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: SfCartesianChart(
-        title: ChartTitle(
-          text: 'Production Analysis',
-          textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+  return Container(
+    padding: const EdgeInsets.all(32),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: Colors.grey[200]!),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.1),
+          blurRadius: 20,
+          offset: const Offset(0, 10),
         ),
-        primaryXAxis: CategoryAxis(),
-        primaryYAxis: NumericAxis(),
-        series: <CartesianSeries<ChartData, String>>[
-          StackedColumnSeries<ChartData, String>(
-            dataSource: producingData,
-            xValueMapper: (ChartData data, _) => data.x,
-            yValueMapper: (ChartData data, _) => data.y,
-            name: 'Producing',
-            color: const Color(0xFF10B981),
-          ),
-          StackedColumnSeries<ChartData, String>(
-            dataSource: nonProducingData,
-            xValueMapper: (ChartData data, _) => data.x,
-            yValueMapper: (ChartData data, _) => data.y,
-            name: 'Non-Producing',
-            color: const Color(0xFFF59E0B),
-          ),
-        ],
-      ),
+      ],
+    ),
+    child: Column(
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.trending_up, size: 32, color: Colors.purple),
+            const SizedBox(width: 12),
+            const Text(
+              'Buffalo Population Growth',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        
+        // Data rows similar to React component
+        Column(
+          children: yearlyData.asMap().entries.map((entry) {
+            final index = entry.key;
+            final data = entry.value;
+            final total = (data['totalBuffaloes'] as num).toDouble();
+            final producing = (data['producingBuffaloes'] as num).toDouble();
+            final percentage = (total / maxBuffaloes) * 100;
+            
+            // Calculate growth percentage
+            double growthPercentage = 0;
+            if (index > 0) {
+              final prevTotal = (yearlyData[index - 1]['totalBuffaloes'] as num).toDouble();
+              growthPercentage = ((total - prevTotal) / prevTotal) * 100;
+            }
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                children: [
+                  // Year and stats row
+                  Row(
+                    children: [
+                      Container(
+                        width: 100,
+                        child: Text(
+                          data['year'].toString(),
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '${formatNumber(total.toInt())} Buffaloes',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              '(${formatNumber(producing.toInt())} producing)',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: growthPercentage > 0
+                                    ? Colors.purple[100]
+                                    : growthPercentage < 0
+                                        ? Colors.red[100]
+                                        : Colors.grey[200],
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                index > 0 
+                                  ? '${growthPercentage > 0 ? '↗ ' : growthPercentage < 0 ? '↘ ' : ''}${growthPercentage.abs().toStringAsFixed(1)}%'
+                                  : 'Start',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: growthPercentage > 0
+                                      ? Colors.purple[700]
+                                      : growthPercentage < 0
+                                          ? Colors.red[700]
+                                          : Colors.grey[700],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 12),
+                  
+                  // Progress bar
+                  Container(
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Stack(
+                      children: [
+                        // Background
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        
+                        // Progress
+                        AnimatedContainer(
+                          duration: const Duration(seconds: 1),
+                          curve: Curves.easeOut,
+                          width: MediaQuery.of(context).size.width * (percentage / 100) * 0.7,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Colors.purple, Colors.indigo, Colors.purple],
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 16),
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                '${percentage.toStringAsFixed(0)}% of peak',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    ),
+  );
+}
+
+  // Production Analysis Graph Widget
+// Production Analysis Graph Widget - CORRECTED
+Widget _buildProductionAnalysisGraph() {
+  final yearlyData = widget.revenueData['yearlyData'] as List<dynamic>;
+  final List<ChartData> producingData = yearlyData.map((data) {
+    return ChartData(
+      data['year'].toString(),
+      (data['producingBuffaloes'] as num).toDouble(),
     );
-  }
+  }).toList();
+
+  final List<ChartData> nonProducingData = yearlyData.map((data) {
+    final total = data['totalBuffaloes'] as int;
+    final producing = data['producingBuffaloes'] as int;
+    return ChartData(data['year'].toString(), (total - producing).toDouble());
+  }).toList();
+
+  return Container(
+    height: 400,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: Colors.grey[300]!),
+    ),
+    child: SfCartesianChart(
+      tooltipBehavior: _tooltipBehavior,
+      title: ChartTitle(
+        text: 'Production Analysis',
+        textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+      ),
+      primaryXAxis: CategoryAxis(),
+      primaryYAxis: NumericAxis(),
+      series: <CartesianSeries<ChartData, String>>[
+        StackedColumnSeries<ChartData, String>(
+          dataSource: producingData,
+          xValueMapper: (ChartData data, _) => data.x,
+          yValueMapper: (ChartData data, _) => data.y,
+          name: 'Producing',
+          color: const Color(0xFF10B981),
+        ),
+        StackedColumnSeries<ChartData, String>(
+          dataSource: nonProducingData,
+          xValueMapper: (ChartData data, _) => data.x,
+          yValueMapper: (ChartData data, _) => data.y,
+          name: 'Non-Producing',
+          color: const Color(0xFFF59E0B),
+        ),
+      ],
+    ),
+  );
+}
 
   // Summary Cards Widget
   Widget _buildSummaryCards() {
@@ -1113,90 +1316,256 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
-                    width: double.infinity,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                      columns: [
-                        DataColumn(
-                          label: Container(
-                            padding: const EdgeInsets.all(12),
-                            child: const Text(
-                              'Month',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ),
+                    height: 600,
+                    child: PlutoGrid(
+                      configuration: PlutoGridConfiguration(
+                        style: PlutoGridStyleConfig(
+                          enableGridBorderShadow: true,
+                          gridBorderColor: Colors.grey[300]!,
+                          gridBorderRadius: BorderRadius.circular(8),
+                          rowHeight: 70,
+                          // headerHeight: 50,
                         ),
-                        ...unitBuffaloes.map((buffalo) {
-                          return DataColumn(
-                            label: Container(
-                              padding: const EdgeInsets.all(12),
+                        columnSize: PlutoGridColumnSizeConfig(
+                          autoSizeMode: PlutoAutoSizeMode.scale,
+                        ),
+                      ),
+                      columns: [
+                        PlutoColumn(
+                          title: 'Month',
+                          field: 'month',
+                          type: PlutoColumnType.text(),
+                          width: 100,
+                          titleTextAlign: PlutoColumnTextAlign.center,
+                          titlePadding: const EdgeInsets.all(12),
+                          cellPadding: const EdgeInsets.all(12),
+                          enableEditingMode: false,
+                          enableSorting: false,
+                          enableColumnDrag: false,
+                          renderer: (rendererContext) {
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                              ),
                               child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
-                                    buffalo['id'] as String,
+                                    rendererContext.cell.value.toString(),
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                        ...unitBuffaloes.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final buffalo = entry.value;
+                          return PlutoColumn(
+                            title: buffalo['id'] as String,
+                            field: 'buffalo_${buffalo['id']}',
+                            type: PlutoColumnType.text(),
+                            width: 120,
+                            titleTextAlign: PlutoColumnTextAlign.center,
+                            titlePadding: const EdgeInsets.all(12),
+                            cellPadding: const EdgeInsets.all(12),
+                            enableEditingMode: false,
+                            enableSorting: false,
+                            enableColumnDrag: false,
+                            renderer: (rendererContext) {
+                              final monthIndex = rendererContext.rowIdx;
+                              final revenue =
+                                  (_monthlyRevenue[_selectedYear
+                                          .toString()]?[monthIndex
+                                          .toString()]?['buffaloes']
+                                      as Map?)?[buffalo['id']] ??
+                                  0;
+                    
+                              Color textColor = Colors.grey;
+                              String phase = 'Rest';
+                              Color backgroundColor = Colors.grey[50]!;
+                    
+                              if (revenue == 9000) {
+                                textColor = Colors.green;
+                                phase = 'High';
+                                backgroundColor = Colors.green[50]!;
+                              } else if (revenue == 6000) {
+                                textColor = Colors.blue;
+                                phase = 'Medium';
+                                backgroundColor = Colors.blue[50]!;
+                              }
+                    
+                              return Container(
+                                decoration: BoxDecoration(
+                                  color: backgroundColor,
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      formatCurrency(revenue.toDouble()),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: textColor,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    Text(
+                                      phase,
+                                      style: TextStyle(
+                                        color: textColor,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+                        }).toList(),
+                        PlutoColumn(
+                          title: 'Unit Total',
+                          field: 'unit_total',
+                          type: PlutoColumnType.text(),
+                          width: 120,
+                          titleTextAlign: PlutoColumnTextAlign.center,
+                          titlePadding: const EdgeInsets.all(12),
+                          cellPadding: const EdgeInsets.all(12),
+                          enableEditingMode: false,
+                          enableSorting: false,
+                          enableColumnDrag: false,
+                          renderer: (rendererContext) {
+                            final monthIndex = rendererContext.rowIdx;
+                            double unitTotal = 0;
+                    
+                            for (final buffalo in unitBuffaloes) {
+                              final revenue =
+                                  (_monthlyRevenue[_selectedYear
+                                          .toString()]?[monthIndex
+                                          .toString()]?['buffaloes']
+                                      as Map?)?[buffalo['id']] ??
+                                  0;
+                              unitTotal += revenue.toDouble();
+                            }
+                    
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: Colors.blue[50],
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
                                   Text(
-                                    buffalo['generation'] == 0
-                                        ? 'Parent'
-                                        : buffalo['generation'] == 1
-                                        ? 'Child'
-                                        : 'Grandchild',
-                                    style: const TextStyle(fontSize: 12),
+                                    formatCurrency(unitTotal),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.purple,
+                                      fontSize: 16,
+                                    ),
                                   ),
                                 ],
                               ),
-                            ),
-                          );
-                        }).toList(),
-                        DataColumn(
-                          label: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.blue[100],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Text(
-                              'Unit Total',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ),
+                            );
+                          },
                         ),
-                        DataColumn(
-                          label: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.orange[100],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Text(
-                              'CPF Cost',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ),
+                        PlutoColumn(
+                          title: 'CPF Cost',
+                          field: 'cpf_cost',
+                          type: PlutoColumnType.text(),
+                          width: 120,
+                          titleTextAlign: PlutoColumnTextAlign.center,
+                          titlePadding: const EdgeInsets.all(12),
+                          cellPadding: const EdgeInsets.all(12),
+                          enableEditingMode: false,
+                          enableSorting: false,
+                          enableColumnDrag: false,
+                          renderer: (rendererContext) {
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: Colors.orange[50],
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    formatCurrency(
+                                      cpfCost['monthlyCPFCost'].toDouble(),
+                                    ),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orange,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
-                        DataColumn(
-                          label: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.green[100],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Text(
-                              'Net Revenue',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ),
+                        PlutoColumn(
+                          title: 'Net Revenue',
+                          field: 'net_revenue',
+                          type: PlutoColumnType.text(),
+                          width: 120,
+                          titleTextAlign: PlutoColumnTextAlign.center,
+                          titlePadding: const EdgeInsets.all(12),
+                          cellPadding: const EdgeInsets.all(12),
+                          enableEditingMode: false,
+                          enableSorting: false,
+                          enableColumnDrag: false,
+                          renderer: (rendererContext) {
+                            final monthIndex = rendererContext.rowIdx;
+                            double unitTotal = 0;
+                    
+                            for (final buffalo in unitBuffaloes) {
+                              final revenue =
+                                  (_monthlyRevenue[_selectedYear
+                                          .toString()]?[monthIndex
+                                          .toString()]?['buffaloes']
+                                      as Map?)?[buffalo['id']] ??
+                                  0;
+                              unitTotal += revenue.toDouble();
+                            }
+                    
+                            final netRevenue =
+                                unitTotal - cpfCost['monthlyCPFCost'];
+                    
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: Colors.green[50],
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    formatCurrency(netRevenue),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: netRevenue >= 0
+                                          ? Colors.green
+                                          : Colors.red,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
                       ],
                       rows: _monthNames.asMap().entries.map((monthEntry) {
                         final monthIndex = monthEntry.key;
                         final monthName = monthEntry.value;
+                    
                         double unitTotal = 0;
-
+                        final Map<String, dynamic> rowData = {
+                          'month': monthName,
+                        };
+                    
+                        // Calculate unit total for this month
                         for (final buffalo in unitBuffaloes) {
                           final revenue =
                               (_monthlyRevenue[_selectedYear
@@ -1204,136 +1573,25 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
                                       .toString()]?['buffaloes']
                                   as Map?)?[buffalo['id']] ??
                               0;
+                          rowData['buffalo_${buffalo['id']}'] = revenue;
                           unitTotal += revenue.toDouble();
                         }
-
-                        final netRevenue =
+                    
+                        rowData['unit_total'] = unitTotal;
+                        rowData['cpf_cost'] = cpfCost['monthlyCPFCost'];
+                        rowData['net_revenue'] =
                             unitTotal - cpfCost['monthlyCPFCost'];
-
-                        return DataRow(
-                          cells: [
-                            DataCell(
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[50],
-                                ),
-                                child: Text(
-                                  monthName,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            ...unitBuffaloes.map((buffalo) {
-                              final revenue =
-                                  (_monthlyRevenue[_selectedYear
-                                          .toString()]?[monthIndex
-                                          .toString()]?['buffaloes']
-                                      as Map?)?[buffalo['id']] ??
-                                  0;
-                              Color textColor = Colors.grey;
-                              String phase = 'Rest';
-
-                              if (revenue == 9000) {
-                                textColor = Colors.green;
-                                phase = 'High';
-                              } else if (revenue == 6000) {
-                                textColor = Colors.blue;
-                                phase = 'Medium';
-                              }
-
-                              return DataCell(
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: revenue == 9000
-                                        ? Colors.green[50]
-                                        : revenue == 6000
-                                        ? Colors.blue[50]
-                                        : Colors.grey[50],
-                                  ),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        formatCurrency(revenue.toDouble()),
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: textColor,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                      Text(
-                                        phase,
-                                        style: TextStyle(
-                                          color: textColor,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                            DataCell(
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue[50],
-                                ),
-                                child: Text(
-                                  formatCurrency(unitTotal),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.purple,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            DataCell(
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange[50],
-                                ),
-                                child: Text(
-                                  formatCurrency(
-                                    cpfCost['monthlyCPFCost'].toDouble(),
-                                  ),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.orange,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            DataCell(
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.green[50],
-                                ),
-                                child: Text(
-                                  formatCurrency(netRevenue),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: netRevenue >= 0
-                                        ? Colors.green
-                                        : Colors.red,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                    
+                        return PlutoRow(
+                          cells: rowData.map((key, value) {
+                            return MapEntry(key, PlutoCell(value: value));
+                          }),
                         );
                       }).toList(),
+                      onLoaded: (PlutoGridOnLoadedEvent event) {
+                        // You can add any post-load logic here
+                      },
                     ),
-                  ),
                   ),
 
                   // Yearly Total Row
@@ -1792,166 +2050,200 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
                 ),
                 const SizedBox(height: 16),
 
-                // Break-Even Timeline Table - Updated
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    columns: const [
-                      DataColumn(label: Text('Year')),
-                      DataColumn(label: Text('Total Buffaloes')),
-                      DataColumn(label: Text('Mature Buffaloes')),
-                      DataColumn(label: Text('Annual Revenue')),
-                      DataColumn(label: Text('Cumulative Revenue')),
-                      DataColumn(label: Text('Status')),
-                    ],
-                    rows: (breakEvenAnalysis['breakEvenData'] as List<dynamic>)
-                        .map((data) {
-                          final double progress =
-                              (data['cumulativeRevenue'] /
-                                  initialInvestment['totalInvestment']) *
-                              100;
-                          String statusText = 'In Progress';
-                          Color statusColor = Colors.grey;
-                          Color textColor = Colors.grey[600]!;
-
-                          if (data['isBreakEven'] == true) {
-                            statusText = '✓ Break-Even';
-                            statusColor = Colors.green[100]!;
-                            textColor = Colors.green[800]!;
-                          } else if (progress >= 75) {
-                            statusText = '75% Recovered';
-                            statusColor = Colors.green[50]!;
-                            textColor = Colors.green[700]!;
-                          } else if (progress >= 50) {
-                            statusText = '50% Recovered';
-                            statusColor = Colors.yellow[100]!;
-                            textColor = Colors.yellow[800]!;
-                          } else if (progress >= 25) {
-                            statusText = '25% Recovered';
-                            statusColor = Colors.blue[50]!;
-                            textColor = Colors.blue[700]!;
-                          }
-
-                          return DataRow(
-                            cells: [
-                              DataCell(
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      data['year'].toString(),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    Text(
-                                      'Year ${(breakEvenAnalysis['breakEvenData'] as List<dynamic>).indexOf(data) + 1}',
-                                      style: TextStyle(
-                                        color: Colors.grey[600],
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              DataCell(
-                                Center(
-                                  child: Text(
-                                    formatNumber(data['totalBuffaloes']),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.purple,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              DataCell(
-                                Center(
-                                  child: Text(
-                                    formatNumber(data['matureBuffaloes']),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blue,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              DataCell(
-                                Center(
-                                  child: Text(
-                                    formatCurrency(data['annualRevenue']),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              DataCell(
-                                Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        formatCurrency(
-                                          data['cumulativeRevenue'],
-                                        ),
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.indigo,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${progress.toStringAsFixed(1)}%',
-                                        style: TextStyle(
-                                          color: progress >= 50
-                                              ? Colors.green
-                                              : Colors.orange,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              DataCell(
+                // Break-Even Timeline Table - PlutoGrid
+                SizedBox(
+                  height: 750,
+                  child: PlutoGrid(
+                    configuration: PlutoGridConfiguration(
+                      style: PlutoGridStyleConfig(
+                        rowHeight: 70,
+                        gridBorderRadius: BorderRadius.circular(8),
+                        gridBorderColor: Colors.grey[300]!,
+                      ),
+                      columnSize: PlutoGridColumnSizeConfig(
+                        autoSizeMode: PlutoAutoSizeMode.scale,
+                      ),
+                    ),
+                    columns: [
+                      PlutoColumn(
+                        title: 'Year',
+                        field: 'year',
+                        type: PlutoColumnType.text(),
+                        width: 220,
+                        renderer: (ctx) {
+                          final idx = ctx.rowIdx + 1;
+                          final year = ctx.cell.value?.toString() ?? '';
+                          return Container(
+                            padding: const EdgeInsets.all(8),
+                            child: Row(
+                              children: [
                                 Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
+                                  width: 44,
+                                  height: 44,
                                   decoration: BoxDecoration(
-                                    color: statusColor,
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: textColor.withOpacity(0.3),
+                                    gradient: LinearGradient(
+                                      colors: [Colors.blue[500]!, Colors.purple[600]!],
                                     ),
+                                    borderRadius: BorderRadius.circular(22),
                                   ),
                                   child: Center(
                                     child: Text(
-                                      statusText,
-                                      style: TextStyle(
-                                        color: textColor,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
-                                      ),
+                                      '$idx',
+                                      style: const TextStyle(
+                                          color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 12),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(year, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                    Text('Year $idx', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                                  ],
+                                ),
+                              ],
+                            ),
                           );
-                        })
-                        .toList(),
+                        },
+                      ),
+                      PlutoColumn(
+                        title: 'Total Buffaloes',
+                        field: 'totalBuffaloes',
+                        type: PlutoColumnType.text(),
+                        width: 140,
+                        renderer: (ctx) {
+                          return Container(
+                            padding: const EdgeInsets.all(8),
+                            child: Text(
+                              ctx.cell.value.toString(),
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.purple),
+                            ),
+                          );
+                        },
+                      ),
+                      PlutoColumn(
+                        title: 'Mature Buffaloes',
+                        field: 'matureBuffaloes',
+                        type: PlutoColumnType.text(),
+                        width: 140,
+                        renderer: (ctx) {
+                          return Container(
+                            padding: const EdgeInsets.all(8),
+                            child: Text(
+                              ctx.cell.value.toString(),
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+                            ),
+                          );
+                        },
+                      ),
+                      PlutoColumn(
+                        title: 'Annual Revenue',
+                        field: 'annualRevenue',
+                        type: PlutoColumnType.text(),
+                        width: 160,
+                        renderer: (ctx) {
+                          final val = ctx.cell.value is num ? (ctx.cell.value as num).toDouble() : double.tryParse(ctx.cell.value.toString().replaceAll(RegExp('[^0-9.-]'), '')) ?? 0.0;
+                          return Container(
+                            padding: const EdgeInsets.all(8),
+                            child: Text(
+                              formatCurrency(val),
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
+                            ),
+                          );
+                        },
+                      ),
+                      PlutoColumn(
+                        title: 'Cumulative Revenue',
+                        field: 'cumulativeRevenue',
+                        type: PlutoColumnType.text(),
+                        width: 180,
+                        renderer: (ctx) {
+                          final val = ctx.cell.value is num ? (ctx.cell.value as num).toDouble() : double.tryParse(ctx.cell.value.toString().replaceAll(RegExp('[^0-9.-]'), '')) ?? 0.0;
+                          final progress = (val / (initialInvestment['totalInvestment'] == 0 ? 1 : initialInvestment['totalInvestment'])) * 100;
+                          return Container(
+                            padding: const EdgeInsets.all(8),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(formatCurrency(val), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                                const SizedBox(height: 4),
+                                Text('${progress.toStringAsFixed(1)}% recovered', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                      PlutoColumn(
+                        title: 'Status',
+                        field: 'status',
+                        type: PlutoColumnType.text(),
+                        width: 160,
+                        renderer: (ctx) {
+                          final cum = (ctx.row.cells['cumulativeRevenue']?.value is num)
+                              ? (ctx.row.cells['cumulativeRevenue']!.value as num).toDouble()
+                              : double.tryParse(ctx.row.cells['cumulativeRevenue']?.value.toString().replaceAll(RegExp('[^0-9.-]'), '') ?? '0') ?? 0.0;
+                          final isBreak = (ctx.row.cells['isBreakEven']?.value == true);
+                          final progress = (cum / (initialInvestment['totalInvestment'] == 0 ? 1 : initialInvestment['totalInvestment'])) * 100;
+
+                          String statusText = 'In Progress';
+                          Color bg = Colors.grey[100]!;
+                          Color txt = Colors.grey[600]!;
+
+                          if (isBreak) {
+                            statusText = '✓ Break-Even';
+                            bg = Colors.green[100]!;
+                            txt = Colors.green[800]!;
+                          } else if (progress >= 75) {
+                            statusText = '75% Recovered';
+                            bg = Colors.green[50]!;
+                            txt = Colors.green[700]!;
+                          } else if (progress >= 50) {
+                            statusText = '50% Recovered';
+                            bg = Colors.yellow[100]!;
+                            txt = Colors.yellow[800]!;
+                          } else if (progress >= 25) {
+                            statusText = '25% Recovered';
+                            bg = Colors.blue[50]!;
+                            txt = Colors.blue[700]!;
+                          }
+
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: bg,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: txt.withOpacity(0.3)),
+                            ),
+                            child: Center(
+                              child: Text(
+                                statusText,
+                                style: TextStyle(color: txt, fontWeight: FontWeight.bold, fontSize: 12),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                    rows: (breakEvenAnalysis['breakEvenData'] as List<dynamic>).asMap().entries.map((entry) {
+                      final data = entry.value as Map<String, dynamic>;
+                      final cum = (data['cumulativeRevenue'] as num).toDouble();
+                      final ann = (data['annualRevenue'] as num).toDouble();
+                      return PlutoRow(
+                        cells: {
+                          'year': PlutoCell(value: data['year'].toString()),
+                          'totalBuffaloes': PlutoCell(value: formatNumber(data['totalBuffaloes'])),
+                          'matureBuffaloes': PlutoCell(value: formatNumber(data['matureBuffaloes'])),
+                          'annualRevenue': PlutoCell(value: ann),
+                          'cumulativeRevenue': PlutoCell(value: cum),
+                          'isBreakEven': PlutoCell(value: data['isBreakEven'] == true),
+                          'status': PlutoCell(value: ''),
+                        },
+                      );
+                    }).toList(),
+                    onLoaded: (PlutoGridOnLoadedEvent event) {},
                   ),
                 ),
                 // SingleChildScrollView(
@@ -2116,7 +2408,7 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
               crossAxisCount: 2,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
-              childAspectRatio: 3.5,
+              childAspectRatio: 6,
             ),
             itemCount: 2,
             itemBuilder: (context, index) {
@@ -2170,18 +2462,18 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
                       Text(
                         asset['value'].toString(),
                         style: TextStyle(
-                          fontSize: 22,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: asset['gradient'] == true
                               ? Colors.white
                               : (asset['color'] as Color),
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 7),
                       Text(
                         asset['label'].toString(),
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.w600,
                           color: asset['gradient'] == true
                               ? Colors.white.withOpacity(0.9)
@@ -2267,67 +2559,104 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    columns: const [
-                      DataColumn(label: Text('Year')),
-                      DataColumn(label: Text('Total Buffaloes')),
-                      DataColumn(label: Text('Buffalo Value')),
-                      DataColumn(label: Text('Total Asset Value')),
-                    ],
-                    rows: assetMarketValue.map((data) {
-                      return DataRow(
-                        cells: [
-                          DataCell(
-                            Column(
+                SizedBox(
+                  height: 750,
+                  child: PlutoGrid(
+                    configuration: PlutoGridConfiguration(
+                      style: PlutoGridStyleConfig(
+                        rowHeight: 70,
+                        gridBorderRadius: BorderRadius.circular(8),
+                        gridBorderColor: Colors.grey[300]!,
+                      ),
+                      columnSize: PlutoGridColumnSizeConfig(
+                        autoSizeMode: PlutoAutoSizeMode.scale,
+                      ),
+                    ),
+                    columns: [
+                      PlutoColumn(
+                        title: 'Year',
+                        field: 'year',
+                        type: PlutoColumnType.text(),
+                        width: 120,
+                        titleTextAlign: PlutoColumnTextAlign.center,
+                        renderer: (ctx) {
+                          final val = ctx.cell.value?.toString() ?? '';
+                          return Container(
+                            padding: const EdgeInsets.all(8),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  data['year'].toString(),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                  val,
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
                                 ),
-                                Text(
-                                  'Year ${assetMarketValue.indexOf(data) + 1}',
-                                  style: TextStyle(color: Colors.grey[600]),
-                                ),
+                                const SizedBox.shrink(),
                               ],
                             ),
-                          ),
-                          DataCell(
-                            Text(
-                              formatNumber(data['totalBuffaloes']),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.purple,
-                              ),
+                          );
+                        },
+                      ),
+                      PlutoColumn(
+                        title: 'Total Buffaloes',
+                        field: 'totalBuffaloes',
+                        type: PlutoColumnType.text(),
+                        width: 140,
+                        titleTextAlign: PlutoColumnTextAlign.center,
+                        renderer: (ctx) {
+                          return Container(
+                            padding: const EdgeInsets.all(8),
+                            child: Text(
+                              ctx.cell.value.toString(),
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.purple),
                             ),
-                          ),
-                          DataCell(
-                            Text(
-                              formatCurrency(data['assetValue'].toDouble()),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue,
-                              ),
+                          );
+                        },
+                      ),
+                      PlutoColumn(
+                        title: 'Buffalo Value',
+                        field: 'assetValue',
+                        type: PlutoColumnType.text(),
+                        width: 140,
+                        titleTextAlign: PlutoColumnTextAlign.center,
+                        renderer: (ctx) {
+                          return Container(
+                            padding: const EdgeInsets.all(8),
+                            child: Text(
+                              ctx.cell.value.toString(),
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
                             ),
-                          ),
-                          DataCell(
-                            Text(
-                              formatCurrency(
-                                data['totalAssetValue'].toDouble(),
-                              ),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.orange,
-                              ),
+                          );
+                        },
+                      ),
+                      PlutoColumn(
+                        title: 'Total Asset Value',
+                        field: 'totalAssetValue',
+                        type: PlutoColumnType.text(),
+                        width: 160,
+                        titleTextAlign: PlutoColumnTextAlign.center,
+                        renderer: (ctx) {
+                          return Container(
+                            padding: const EdgeInsets.all(8),
+                            child: Text(
+                              ctx.cell.value.toString(),
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
                             ),
-                          ),
-                        ],
+                          );
+                        },
+                      ),
+                    ],
+                    rows: assetMarketValue.map((data) {
+                      return PlutoRow(
+                        cells: {
+                          'year': PlutoCell(value: data['year'].toString()),
+                          'totalBuffaloes': PlutoCell(value: formatNumber(data['totalBuffaloes'])),
+                          'assetValue': PlutoCell(value: formatCurrency(data['assetValue'].toDouble())),
+                          'totalAssetValue': PlutoCell(value: formatCurrency(data['totalAssetValue'].toDouble())),
+                        },
                       );
                     }).toList(),
+                    onLoaded: (PlutoGridOnLoadedEvent event) {},
                   ),
                 ),
               ],
@@ -2618,7 +2947,7 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
         children: [
           // Header
           Container(
-            padding: const EdgeInsets.all(40),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -2634,12 +2963,12 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
             ),
             child: Column(
               children: [
-                const SizedBox(height: 40),
+                // const SizedBox(height: 40),
                 Row(
                   children: [
                     const Icon(
                       Icons.currency_rupee,
-                      size: 60,
+                      size: 40,
                       color: Colors.white,
                     ),
                     const SizedBox(width: 16),
@@ -2650,7 +2979,7 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
                           Text(
                             'Annual Herd Revenue Breakdown',
                             style: TextStyle(
-                              fontSize: 32,
+                              fontSize: 25,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
@@ -2659,7 +2988,7 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
                           Text(
                             'Detailed year-by-year financial analysis based on actual herd growth with staggered cycles',
                             style: TextStyle(
-                              fontSize: 18,
+                              fontSize: 14,
                               color: Colors.blue[100],
                             ),
                           ),
@@ -2675,192 +3004,154 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
           // Table
           Container(
             color: Colors.white,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                columns: const [
-                  DataColumn(label: Text('Year')),
-                  DataColumn(label: Text('Total\nBuffaloes')),
-                  DataColumn(label: Text('Mature\nBuffaloes')),
-                  DataColumn(label: Text('Annual\nRevenue')),
-                  DataColumn(label: Text('Cumulative\nRevenue')),
-                ],
-                rows: yearlyData.map((data) {
-                  final index = yearlyData.indexOf(data);
-                  final cumulativeRevenue = yearlyData
-                      .sublist(0, index + 1)
-                      .fold(
-                        0.0,
-                        (sum, item) => sum + (item['revenue'] as num).toDouble(),
+            child: SizedBox(
+              height: 420,
+              child: PlutoGrid(
+                configuration: PlutoGridConfiguration(
+                  style: PlutoGridStyleConfig(
+                    rowHeight: 90,
+                    gridBorderRadius: BorderRadius.circular(8),
+                    gridBorderColor: Colors.grey[300]!,
+                  ),
+                  columnSize: PlutoGridColumnSizeConfig(
+                    autoSizeMode: PlutoAutoSizeMode.scale,
+                  ),
+                ),
+                columns: [
+                  PlutoColumn(
+                    title: 'Year',
+                    field: 'year',
+                    type: PlutoColumnType.text(),
+                    width: 220,
+                    renderer: (rendererContext) {
+                      final idx = rendererContext.rowIdx + 1;
+                      final year = rendererContext.cell.value.toString();
+                      return Container(
+                        padding: const EdgeInsets.all(8),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [Colors.blue[500]!, Colors.purple[600]!],
+                                ),
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '$idx',
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(year, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                                Text('Year $idx', style: TextStyle(color: Colors.grey[600])),
+                              ],
+                            ),
+                          ],
+                        ),
                       );
-                  final growthRate = index > 0
-                      ? ((data['revenue'] - (yearlyData[index - 1])['revenue']) /
-                                (yearlyData[index - 1])['revenue'] *
-                                100)
-                            .toStringAsFixed(1)
-                      : '0.0';
-
-                  return DataRow(
-                    cells: [
-                      DataCell(
-                        Container(
-                          width: 120,
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Colors.blue[500]!,
-                                      Colors.purple[600]!,
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(24),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '${index + 1}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 20,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    data['year'].toString(),
-                                    style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Year ${index + 1}',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      DataCell(
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                    },
+                  ),
+                  PlutoColumn(
+                    title: 'Total Buffaloes',
+                    field: 'totalBuffaloes',
+                    type: PlutoColumnType.text(),
+                    width: 140,
+                    renderer: (ctx) {
+                      return Container(
+                        padding: const EdgeInsets.all(8),
+                        child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              formatNumber(data['totalBuffaloes']),
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.purple,
-                              ),
-                            ),
-                            Text(
-                              'total buffaloes',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                            ),
+                            Text(ctx.cell.value.toString(), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.purple)),
+                            Text('total buffaloes', style: TextStyle(color: Colors.grey[600])),
                           ],
                         ),
-                      ),
-                      DataCell(
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      );
+                    },
+                  ),
+                  PlutoColumn(
+                    title: 'Mature Buffaloes',
+                    field: 'producingBuffaloes',
+                    type: PlutoColumnType.text(),
+                    width: 140,
+                    renderer: (ctx) {
+                      return Container(
+                        padding: const EdgeInsets.all(8),
+                        child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              formatNumber(data['producingBuffaloes']),
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue,
-                              ),
-                            ),
-                            Text(
-                              'mature buffaloes',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                            ),
+                            Text(ctx.cell.value.toString(), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue)),
+                            Text('mature buffaloes', style: TextStyle(color: Colors.grey[600])),
                           ],
                         ),
-                      ),
-                      DataCell(
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      );
+                    },
+                  ),
+                  PlutoColumn(
+                    title: 'Annual Revenue',
+                    field: 'revenue',
+                    type: PlutoColumnType.text(),
+                    width: 160,
+                    renderer: (ctx) {
+                      return Container(
+                        padding: const EdgeInsets.all(8),
+                        child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              formatCurrency(data['revenue'].toDouble()),
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
-                              ),
-                            ),
-                            if (double.parse(growthRate) > 0)
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.arrow_upward,
-                                    size: 20,
-                                    color: Colors.green,
-                                  ),
-                                  Text(
-                                    '$growthRate% growth',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      color: Colors.green,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            Text(ctx.cell.value.toString(), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green)),
+                            // optional growth text omitted here
                           ],
                         ),
-                      ),
-                      DataCell(
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      );
+                    },
+                  ),
+                  PlutoColumn(
+                    title: 'Cumulative Revenue',
+                    field: 'cumulativeRevenue',
+                    type: PlutoColumnType.text(),
+                    width: 180,
+                    renderer: (ctx) {
+                      return Container(
+                        padding: const EdgeInsets.all(8),
+                        child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              formatCurrency(cumulativeRevenue),
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.indigo,
-                              ),
-                            ),
-                            Text(
-                              '${((cumulativeRevenue / totalRevenue) * 100).toStringAsFixed(1)}% of total',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                            ),
+                            Text(ctx.cell.value.toString(), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                            Text('${((double.tryParse(ctx.cell.value.toString().replaceAll(RegExp('[^0-9.]'), '')) ?? 0) / (totalRevenue == 0 ? 1 : totalRevenue) * 100).toStringAsFixed(1)}% of total', style: TextStyle(color: Colors.grey[600])),
                           ],
                         ),
-                      ),
-                    ],
+                      );
+                    },
+                  ),
+                ],
+                rows: yearlyData.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final data = entry.value;
+                  final cumulativeRevenue = yearlyData.sublist(0, index + 1).fold(0.0, (sum, item) => sum + (item['revenue'] as num).toDouble());
+                  return PlutoRow(
+                    cells: {
+                      'year': PlutoCell(value: data['year'].toString()),
+                      'totalBuffaloes': PlutoCell(value: formatNumber(data['totalBuffaloes'])),
+                      'producingBuffaloes': PlutoCell(value: formatNumber(data['producingBuffaloes'])),
+                      'revenue': PlutoCell(value: formatCurrency((data['revenue'] as num).toDouble())),
+                      'cumulativeRevenue': PlutoCell(value: formatCurrency(cumulativeRevenue)),
+                    },
                   );
                 }).toList(),
+                onLoaded: (PlutoGridOnLoadedEvent event) {},
               ),
             ),
           ),
@@ -3286,11 +3577,11 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
   // Graph Navigation Widget
   Widget _buildGraphNavigation() {
     final List<Map<String, dynamic>> buttons = [
-      {'key': 'revenue', 'label': '💰 Revenue Trends', 'color': Colors.green},
-      {'key': 'buffaloes', 'label': '🐃 Herd Growth', 'color': Colors.purple},
+      {'key': 'revenue', 'label': 'Revenue Trends', 'color': Colors.green},
+      {'key': 'buffaloes', 'label': 'Herd Growth', 'color': Colors.purple},
       {
-        'key': 'nonproducing',
-        'label': '📊 Production Analysis',
+        'key': 'production',
+        'label': 'Production Analysis',
         'color': Colors.orange,
       },
     ];
@@ -3336,7 +3627,7 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
   Widget _buildGraphsSection() {
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.only(bottom: 32, top: 12, right: 32, left: 32),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(32),
@@ -3351,7 +3642,7 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
       ),
       child: Column(
         children: [
-          const SizedBox(height: 64),
+          // const SizedBox(height: 64),
           Text(
             'Herd Performance Analytics',
             style: TextStyle(
@@ -3361,16 +3652,16 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 10),
 
           // Graph Navigation
           _buildGraphNavigation(),
-          const SizedBox(height: 40),
+          const SizedBox(height: 20),
 
           // Graph Display
           if (_activeGraph == 'revenue') _buildRevenueGraph(),
           if (_activeGraph == 'buffaloes') _buildBuffaloGrowthGraph(),
-          if (_activeGraph == 'nonproducing') _buildProductionAnalysisGraph(),
+          if (_activeGraph == 'production') _buildProductionAnalysisGraph(),
         ],
       ),
     );
@@ -3559,7 +3850,7 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
-                const SizedBox(height: 20),
+                // const SizedBox(height: 20),
 
                 // Header
                 Text(
@@ -3572,12 +3863,12 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
                   textAlign: TextAlign.center,
                 ),
 
-                const SizedBox(height: 40),
+                const SizedBox(height: 20),
 
                 // Summary Cards
                 _buildSummaryCards(),
 
-                const SizedBox(height: 40),
+                const SizedBox(height: 20),
 
                 // Section Cards
                 _buildSectionTabs(),
@@ -3617,14 +3908,14 @@ class _CostEstimationTableState extends State<CostEstimationTable> {
                 if (selectedSection == 'all' ||
                     selectedSection == 'annual_revenue') ...[
                   _buildRevenueTable(),
-                  const SizedBox(height: 40),
+                  // const SizedBox(height: 40),
                 ],
 
-                const SizedBox(height: 40),
+                // const SizedBox(height: 20),
 
                 // Additional Information
                 // _buildAdditionalInformation(),
-                const SizedBox(height: 40),
+                // const SizedBox(height: 40),
 
                 // Action Buttons
                 Row(
